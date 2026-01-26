@@ -94,27 +94,25 @@ struct VerticalWebView: UIViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-                guard message.name == "textSelected",
-                      let body = message.body as? [String: Any] else {
-                    return
-                }
-                
-                guard let text = body["text"] as? String,
-                      let rectData = body["rect"] as? [String: Any],
-                      let x = rectData["x"] as? CGFloat,
-                      let y = rectData["y"] as? CGFloat,
-                      let w = rectData["width"] as? CGFloat,
-                      let h = rectData["height"] as? CGFloat else {
-                    return
-                }
-                
-                let sentence = body["sentence"] as? String
-                let rect = CGRect(x: x, y: y, width: w, height: h)
-                let selectionData = SelectionData(text: text, sentence: sentence, rect: rect)
-                
-                if let highlightCount = parent.onTextSelected?(selectionData) {
-                    highlightSelection(count: highlightCount)
-                }
+            guard message.name == "textSelected",
+                  let body = message.body as? [String: Any] else {
+                return
+            }
+            guard let text = body["text"] as? String,
+                  let rectData = body["rect"] as? [String: Any],
+                  let x = rectData["x"] as? CGFloat,
+                  let y = rectData["y"] as? CGFloat,
+                  let w = rectData["width"] as? CGFloat,
+                  let h = rectData["height"] as? CGFloat else {
+                return
+            }
+            let sentence = body["sentence"] as? String
+            let rect = CGRect(x: x, y: y, width: w, height: h)
+            let selectionData = SelectionData(text: text, sentence: sentence, rect: rect)
+            
+            if let highlightCount = parent.onTextSelected?(selectionData) {
+                highlightSelection(count: highlightCount)
+            }
         }
         
         private var readerJS: String {

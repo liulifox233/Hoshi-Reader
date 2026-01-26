@@ -90,20 +90,27 @@ window.hoshiReader = {
         return (partsBefore.reverse().join('') + partsAfter.join('')).trim();
     },
 
-    getCaretPosition(x, y) {
-        const pos = document.caretPositionFromPoint(x, y);
-        if (!pos) {
-            return null;
-        }
+    getCaretRange(x, y) {
+        if (document.caretPositionFromPoint) {
+            const pos = document.caretPositionFromPoint(x, y);
+            if (!pos) {
+                return null;
+            }
 
-        const range = document.createRange();
-        range.setStart(pos.offsetNode, pos.offset);
-        range.collapse(true);
-        return range;
+            const range = document.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+            return range;
+        }
+        else if (document.caretRangeFromPoint) {
+            const range = document.caretRangeFromPoint(x, y);
+            return range;
+        }
+        return null;
     },
 
     getCharacterAtPoint(x, y) {
-        const range = this.getCaretPosition(x, y);
+        const range = this.getCaretRange(x, y);
         if (!range) {
             return null;
         }
