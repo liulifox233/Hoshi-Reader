@@ -18,6 +18,7 @@ A lightweight Japanese EPUB reader designed for iOS 26 with Yomitan dictionary s
 
 ## Download
 
+[![TestFlight](https://img.shields.io/badge/TestFlight-Join%20Beta-blue?logo=testflight&style=for-the-badge)](https://testflight.apple.com/join/G6KHqNAC)
 ## Features
 
 <div align="left">
@@ -27,7 +28,6 @@ A lightweight Japanese EPUB reader designed for iOS 26 with Yomitan dictionary s
 - Full support for Yomitan term and frequency dictionaries
 - Anki integration, one click mining
 - Mining handlebars that conform to Yomitan's format
-- Fully offline
 
 </div>
 </div>
