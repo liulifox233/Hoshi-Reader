@@ -75,5 +75,13 @@ struct AnkiView: View {
             }
         }
         .navigationTitle("Anki")
+        .alert("Error", isPresented: .init(
+            get: { ankiManager.errorMessage != nil },
+            set: { if !$0 { ankiManager.errorMessage = nil } }
+        )) {
+            Button("OK") { ankiManager.errorMessage = nil }
+        } message: {
+            Text(ankiManager.errorMessage ?? "")
+        }
     }
 }

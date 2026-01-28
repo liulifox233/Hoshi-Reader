@@ -23,7 +23,9 @@ class AnkiManager {
     var availableNoteTypes: [AnkiNoteType] = []
     
     var allowDupes: Bool = false
-    
+
+    var errorMessage: String?
+
     var isConnected: Bool { !availableDecks.isEmpty }
     
     private static let scheme = "hoshi://"
@@ -50,11 +52,14 @@ class AnkiManager {
     
     func fetch() {
         guard let data = UIPasteboard.general.data(forPasteboardType: Self.pasteboardType) else {
+            errorMessage = "No data received from Anki"
             return
         }
         UIPasteboard.general.setData(Data(), forPasteboardType: Self.pasteboardType)
-        
+
         guard let response = try? JSONDecoder().decode(AnkiResponse.self, from: data) else {
+            let rawString = String(data: data, encoding: .utf8) ?? "Unable to read data"
+            errorMessage = "Failed to decode Anki response:\n\n\(rawString)"
             return
         }
         availableDecks = response.decks.map(\.name)
