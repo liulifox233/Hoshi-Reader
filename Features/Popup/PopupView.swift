@@ -139,7 +139,10 @@ struct PopupView: View {
             for pitchEntry in result.term.pitches {
                 var pitchPositions: [Int] = []
                 for element in pitchEntry.pitch_positions {
-                    pitchPositions.append(Int(element))
+                    let position = Int(element)
+                    if !pitchPositions.contains(position) {
+                        pitchPositions.append(position)
+                    }
                 }
                 pitches.append(PitchData(dictionary: String(pitchEntry.dict_name), pitchPositions: pitchPositions))
             }
