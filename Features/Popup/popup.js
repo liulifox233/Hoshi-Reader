@@ -31,6 +31,10 @@ function el(tag, props = {}, children = []) {
     return element;
 }
 
+function toHiragana(text) {
+    return text.replace(/[\u30A1-\u30F6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
 function toKebabCase(str) {
     return str.replace(/([A-Z])/g, (_, c, i) => (i ? '-' : '') + c.toLowerCase());
 }
@@ -59,6 +63,7 @@ function segmentFurigana(expression, reading) {
     }
 
     const segments = expression.match(KANJI_SEGMENT_PATTERN) || [];
+    const readingNormalized = toHiragana(reading);
     const result = [];
     let readingPos = 0;
 
@@ -67,7 +72,7 @@ function segmentFurigana(expression, reading) {
         const isKanji = KANJI_PATTERN.test(text[0]);
 
         if (!isKanji) {
-            const matchPos = reading.indexOf(text, readingPos);
+            const matchPos = readingNormalized.indexOf(toHiragana(text), readingPos);
             if (matchPos > readingPos && result.length && result.at(-1)[1] === null) {
                 result.at(-1)[1] = reading.slice(readingPos, matchPos);
             }
@@ -77,7 +82,7 @@ function segmentFurigana(expression, reading) {
             }
         } else {
             const nextKana = segments.slice(i + 1).find(segment => !KANJI_PATTERN.test(segment[0]));
-            const nextPos = nextKana ? reading.indexOf(nextKana, readingPos) : -1;
+            const nextPos = nextKana ? readingNormalized.indexOf(toHiragana(nextKana), readingPos + 1) : -1;
 
             if (nextPos !== -1) {
                 result.push([text, reading.slice(readingPos, nextPos)]);
