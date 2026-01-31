@@ -23,9 +23,9 @@ class AnkiManager {
     var availableNoteTypes: [AnkiNoteType] = []
     
     var allowDupes: Bool = false
-
+    
     var errorMessage: String?
-
+    
     var isConnected: Bool { !availableDecks.isEmpty }
     
     private static let scheme = "hoshi://"
@@ -67,7 +67,7 @@ class AnkiManager {
             return
         }
         UIPasteboard.general.setData(Data(), forPasteboardType: Self.pasteboardType)
-
+        
         guard let response = try? JSONDecoder().decode(AnkiResponse.self, from: data) else {
             let rawString = String(data: data, encoding: .utf8) ?? "Unable to read data"
             errorMessage = "Failed to decode Anki response:\n\n\(rawString)"
@@ -92,7 +92,7 @@ class AnkiManager {
         
         save()
     }
-
+    
     func addNote(content: [String: String], sentence: String?) {
         guard let deck = selectedDeck,
               let noteType = selectedNoteType,
@@ -108,7 +108,7 @@ class AnkiManager {
               let pitchCategories = content["pitchCategories"] else {
             return
         }
-
+        
         let singleGlossaries: [String: String]
         if let json = content["singleGlossaries"],
            let data = json.data(using: .utf8),
@@ -117,13 +117,13 @@ class AnkiManager {
         } else {
             singleGlossaries = [:]
         }
-
+        
         var urlComponents = URLComponents(string: Self.addNoteCallback)
         var queryItems = [
             URLQueryItem(name: "deck", value: deck),
             URLQueryItem(name: "type", value: noteType)
         ]
-
+        
         for (field, handlebar) in fieldMappings {
             let value: String
             if handlebar.hasPrefix(Handlebars.singleGlossaryPrefix) {
@@ -216,5 +216,4 @@ class AnkiManager {
         availableDecks = config.availableDecks
         availableNoteTypes = config.availableNoteTypes
     }
-    
 }

@@ -10,10 +10,13 @@ import SwiftUI
 import EPUBKit
 
 struct WebViewState: Hashable {
+    var verticalWriting: Bool
     var fontSize: Int
     var horizontalPadding: Int
     var verticalPadding: Int
     var size: CGSize
+    var textColor: Color
+    var selectedFont: String
     var hideFurigana: Bool
 }
 
@@ -44,11 +47,45 @@ struct ReaderView: View {
     @Environment(UserConfig.self) private var userConfig
     @State private var viewModel: ReaderViewModel
     @State private var topSafeArea: CGFloat = 0
+    @State private var focusMode = false
     
-    private let webViewPadding: CGFloat = 48
+    private let webViewPadding: CGFloat = 4
+    private let lineHeight: CGFloat = 16
+    
+    var readerBackgroundColor: Color {
+        switch userConfig.theme {
+        case .sepia:
+            return Color(red: 0.949, green: 0.886, blue: 0.788)
+        case .custom:
+            return userConfig.customBackgroundColor
+        default:
+            return Color(.systemBackground)
+        }
+    }
+    
+    var readerTextColor: Color {
+        switch userConfig.theme {
+        case .custom:
+            return userConfig.customTextColor
+        default:
+            return Color(.label)
+        }
+    }
     
     init(document: EPUBDocument, rootURL: URL) {
         _viewModel = State(initialValue: ReaderViewModel(document: document, rootURL: rootURL))
+    }
+    
+    var progressString: String {
+        var result: [String] = []
+        if userConfig.readerShowCharacters {
+            result.append("\(viewModel.currentCharacter) / \(viewModel.bookInfo.characterCount)")
+        }
+        if userConfig.readerShowPercentage {
+            let percent = viewModel.bookInfo.characterCount > 0 ? (Double(viewModel.currentCharacter) / Double(viewModel.bookInfo.characterCount) * 100) : 0
+            result.append("\(String(format: "%.2f%%", percent))")
+        }
+        return result.joined(separator: " ")
     }
     
     var body: some View {
@@ -56,12 +93,12 @@ struct ReaderView: View {
         // if you tab out and tab back in, the area recalculates causing the reader to be misaligned
         VStack(spacing: 0) {
             Color.clear
-                .frame(height: topSafeArea + webViewPadding)
+                .frame(height: topSafeArea + webViewPadding + (userConfig.readerShowProgressTop && !progressString.isEmpty ? lineHeight : 0) + (userConfig.readerShowTitle ? lineHeight : 0))
                 .contentShape(Rectangle())
             
             GeometryReader { geometry in
                 ZStack {
-                    VerticalWebView(
+                    ReaderWebView(
                         fileURL: viewModel.getCurrentChapter(),
                         contentURL: viewModel.document.contentDirectory,
                         userConfig: userConfig,
@@ -76,10 +113,13 @@ struct ReaderView: View {
                         onTapOutside: viewModel.closePopup
                     )
                     .id(WebViewState(
+                        verticalWriting: userConfig.verticalWriting,
                         fontSize: userConfig.fontSize,
                         horizontalPadding: userConfig.horizontalPadding,
                         verticalPadding: userConfig.verticalPadding,
                         size: geometry.size,
+                        textColor: readerTextColor,
+                        selectedFont: userConfig.selectedFont,
                         hideFurigana: userConfig.readerHideFurigana
                     ))
                     
@@ -89,51 +129,21 @@ struct ReaderView: View {
                         lookupResults: viewModel.lookupResults,
                         dictionaryStyles: viewModel.dictionaryStyles,
                         screenSize: geometry.size,
+                        isVertical: userConfig.verticalWriting
                     )
                     .zIndex(100)
                 }
             }
-        }
-        .onAppear {
-            // swiftui bug? if the button is pressed too quickly after opening a book, the menu slides to the top of the screen
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                viewModel.markReady()
-            }
             
-            if topSafeArea == 0 {
-                topSafeArea = UIApplication.topSafeArea
-            }
-        }
-        .overlay(alignment: .top) {
-            VStack {
-                if let title = viewModel.document.title {
-                    Text(title)
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 10)
-                        .lineLimit(1)
-                }
-                Text("\(viewModel.currentCharacter) / \(viewModel.bookInfo.characterCount)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, topSafeArea)
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .bottomBar) {
-                Circle()
-                    .fill(.clear)
-                    .frame(width: 36, height: 36)
-                    .overlay {
-                        Image(systemName: "chevron.left")
-                    }
+            HStack {
+                CircleButton(systemName: "chevron.left")
                     .onTapGesture {
                         dismiss()
                     }
+                    .opacity(focusMode ? 0 : 1)
                 
                 Spacer()
                 
-                // TODO: half of the button does nothing
                 Menu {
                     Button {
                         viewModel.activeSheet = .chapters
@@ -147,9 +157,54 @@ struct ReaderView: View {
                         Label("Appearance", systemImage: "paintbrush.pointed")
                     }
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
+                    CircleButton(systemName: "slider.horizontal.3")
                 }
-                .disabled(!viewModel.ready)
+                .tint(.primary)
+                .opacity(focusMode ? 0 : 1)
+            }
+            .padding(.horizontal, 20)
+            .frame(height: UIApplication.bottomSafeArea + 8, alignment: .top)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.default.speed(2)) {
+                    focusMode.toggle()
+                }
+            }
+        }
+        .background(readerBackgroundColor)
+        .onAppear {
+            if topSafeArea == 0 {
+                topSafeArea = UIApplication.topSafeArea
+            }
+        }
+        .overlay(alignment: .top) {
+            VStack {
+                if !focusMode {
+                    if userConfig.readerShowTitle {
+                        if let title = viewModel.document.title {
+                            Text(title)
+                                .font(.subheadline)
+                                .foregroundStyle(.tertiary)
+                                .padding(.horizontal, 30)
+                                .lineLimit(1)
+                        }
+                    }
+                    if userConfig.readerShowProgressTop && !progressString.isEmpty {
+                        Text(progressString)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.top, topSafeArea)
+        }
+        .overlay(alignment: .bottom) {
+            VStack {
+                if !focusMode && !userConfig.readerShowProgressTop && !progressString.isEmpty {
+                    Text(progressString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .sheet(item: $viewModel.activeSheet) { item in
@@ -157,6 +212,7 @@ struct ReaderView: View {
             case .appearance:
                 AppearanceView(userConfig: userConfig)
                     .presentationDetents([.medium])
+                    .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : userConfig.theme.colorScheme)
             case .chapters:
                 ChapterListView(document: viewModel.document, bookInfo: viewModel.bookInfo, currentIndex: viewModel.index, currentCharacter: viewModel.currentCharacter, coverURL: viewModel.coverURL) { spineIndex in
                     viewModel.setIndex(index: spineIndex, progress: 0)
@@ -165,9 +221,36 @@ struct ReaderView: View {
                 .presentationDetents([.medium, .large])
             }
         }
-        .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
         .navigationBarBackButtonHidden(true)
         .ignoresSafeArea(edges: .top)
-        .statusBarHidden()
+        .statusBarHidden(focusMode)
+    }
+}
+
+struct CircleButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let systemName: String
+    let interactive: Bool
+    
+    init(systemName: String, interactive: Bool = true) {
+        self.systemName = systemName
+        self.interactive = interactive
+    }
+    
+    var body: some View {
+        if #available(iOS 26, *) {
+            Image(systemName: systemName)
+                .font(.system(size: 20))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 44)
+                .glassEffect(interactive ? .regular.interactive() : .regular)
+                .padding(8)
+                .contentShape(Circle())
+        } else {
+            Image(systemName: systemName)
+                .font(.system(size: 20))
+                .foregroundStyle(.primary)
+                .padding(8)
+        }
     }
 }

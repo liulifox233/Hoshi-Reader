@@ -21,7 +21,7 @@ enum ActiveSheet: Identifiable {
 class ReaderLoaderViewModel {
     var document: EPUBDocument?
     let book: BookMetadata
-
+    
     var rootURL: URL? {
         guard let booksFolder = try? BookStorage.getBooksDirectory(),
               let folder = book.folder else {
@@ -62,7 +62,6 @@ class ReaderViewModel {
     var currentProgress: Double = 0.0
     var activeSheet: ActiveSheet?
     var bookInfo: BookInfo
-    var ready = false
     
     // lookup stuff
     var showPopup = false
@@ -142,17 +141,13 @@ class ReaderViewModel {
         }
         return false
     }
-
+    
     func previousChapter() -> Bool {
         if index > 0 {
             setIndex(index: index - 1, progress: 1)
             return true
         }
         return false
-    }
-    
-    func markReady() {
-        ready = true
     }
     
     func handleTextSelection(_ selection: SelectionData, maxResults: Int) -> Int? {

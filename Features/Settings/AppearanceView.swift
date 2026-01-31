@@ -7,10 +7,15 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AppearanceView: View {
     let userConfig: UserConfig
     @Environment(\.dismiss) var dismiss
+    @State private var isImportingFont = false
+    @State private var importedFonts: [String] = []
+    @State private var showingDeleteConfirmation = false
+    @State private var fontToDelete: String? = nil
     
     var body: some View {
         @Bindable var userConfig = userConfig
@@ -23,9 +28,78 @@ struct AppearanceView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    if userConfig.theme == .custom {
+                        Picker("Interface", selection: $userConfig.uiTheme) {
+                            Text("System").tag(Themes.system)
+                            Text("Light").tag(Themes.light)
+                            Text("Dark").tag(Themes.dark)
+                        }
+                        ColorPicker("Background Color", selection: $userConfig.customBackgroundColor)
+                        ColorPicker("Text Color", selection: $userConfig.customTextColor)
+                    }
                 }
                 
-                Section("Reader") {
+                Section("Reader Layout") {
+                    HStack {
+                        Text("Text Orientation")
+                        Spacer()
+                        Picker("", selection: $userConfig.verticalWriting) {
+                            Text("縦").tag(true)
+                            Text("横").tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 100)
+                    }
+                    
+                    HStack {
+                        Picker("Font", selection: $userConfig.selectedFont) {
+                            ForEach(FontManager.defaultFonts + importedFonts, id: \.self) { font in
+                                Text(font).tag(font)
+                            }
+                        }
+                        
+                        if !FontManager.shared.isDefaultFont(name: userConfig.selectedFont) {
+                            Button {
+                                fontToDelete = userConfig.selectedFont
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                                    .foregroundStyle(.red)
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog("", isPresented: $showingDeleteConfirmation, titleVisibility: .hidden) {
+                                Button("Delete", role: .destructive) {
+                                    if let fontName = fontToDelete {
+                                        try? FontManager.shared.deleteFont(name: fontName)
+                                        userConfig.selectedFont = FontManager.defaultFonts[0]
+                                        importedFonts = (try? FontManager.shared.getFontsFromStorage())?.map { $0.deletingPathExtension().lastPathComponent } ?? []
+                                    }
+                                }
+                            } message: {
+                                if let fontName = fontToDelete {
+                                    Text("Delete \"\(fontName)\"?")
+                                }
+                            }
+                        }
+                    }
+                    
+                    Button {
+                        isImportingFont = true
+                    } label: {
+                        Text("Import Font")
+                    }
+                    .fileImporter(
+                        isPresented: $isImportingFont,
+                        allowedContentTypes: [.font],
+                        onCompletion: { result in
+                            if case .success(let url) = result {
+                                try? FontManager.shared.importFont(from: url)
+                                importedFonts = (try? FontManager.shared.getFontsFromStorage())?.map { $0.deletingPathExtension().lastPathComponent } ?? []
+                            }
+                        }
+                    )
+                    
                     HStack {
                         Text("Font Size")
                         Spacer()
@@ -54,6 +128,25 @@ struct AppearanceView: View {
                     }
                     
                     Toggle("Hide Furigana", isOn: $userConfig.readerHideFurigana)
+                }
+                
+                Section("Reader Display") {
+                    Toggle("Show Title", isOn: $userConfig.readerShowTitle)
+                    Toggle("Show Character Count", isOn: $userConfig.readerShowCharacters)
+                    Toggle("Show Percentage", isOn: $userConfig.readerShowPercentage)
+                    
+                    if userConfig.readerShowCharacters || userConfig.readerShowPercentage {
+                        HStack {
+                            Text("Position")
+                            Spacer()
+                            Picker("", selection: $userConfig.readerShowProgressTop) {
+                                Text("Top").tag(true)
+                                Text("Bottom").tag(false)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 120)
+                        }
+                    }
                 }
                 
                 Section("Popup") {
@@ -92,6 +185,9 @@ struct AppearanceView: View {
                         Image(systemName: "xmark")
                     }
                 }
+            }
+            .onAppear {
+                importedFonts = (try? FontManager.shared.getFontsFromStorage())?.map { $0.deletingPathExtension().lastPathComponent } ?? []
             }
         }
     }
