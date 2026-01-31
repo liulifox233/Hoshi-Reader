@@ -12,10 +12,6 @@ window.hoshiReader = {
     sentenceDelimiters: '。！？.!?\n\r',
     ttuRegex: /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
     
-    isVertical() {
-        return window.getComputedStyle(document.body).writingMode === "vertical-rl";
-    },
-    
     isScanBoundary(char) {
         return /^[\s\u3000]$/.test(char) || this.scanDelimiters.includes(char);
     },
@@ -43,6 +39,7 @@ window.hoshiReader = {
     },
     
     calculateProgress() {
+        var vertical = window.getComputedStyle(document.body).writingMode === "vertical-rl";
         var walker = this.createWalker();
         var totalChars = 0;
         var exploredChars = 0;
@@ -55,8 +52,8 @@ window.hoshiReader = {
             if (nodeLen > 0) {
                 var range = document.createRange();
                 range.selectNodeContents(node);
-                var anchor = this.isVertical() ? range.getBoundingClientRect().top : range.getBoundingClientRect().left;
-                if (anchor < 0) {
+                var rect = range.getBoundingClientRect();
+                if ((vertical ? rect.top : rect.left) < 0) {
                     exploredChars += nodeLen;
                 }
             }
@@ -66,49 +63,105 @@ window.hoshiReader = {
     },
     
     restoreProgress(progress) {
+        var notifyComplete = () => window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
+        var vertical = window.getComputedStyle(document.body).writingMode === "vertical-rl";
+        var scrollEl = document.scrollingElement || document.documentElement || document.body;
+        var pageSize = vertical ? scrollEl.clientHeight : scrollEl.clientWidth;
+        var totalSize = vertical ? scrollEl.scrollHeight : scrollEl.scrollWidth;
+        var maxScroll = Math.max(0, totalSize - pageSize);
+        
+        if (pageSize <= 0) {
+            notifyComplete();
+            return;
+        }
+        
         if (progress <= 0) {
+            if (vertical) {
+                scrollEl.scrollTop = 0;
+                window.scrollTo(0, 0);
+            } else {
+                scrollEl.scrollLeft = 0;
+                window.scrollTo(0, 0);
+            }
+            notifyComplete();
             return;
         }
         
-        var vertical = this.isVertical();
-        var pageSize = vertical ? window.innerHeight : window.innerWidth;
-        var totalSize = vertical ? document.body.scrollHeight : document.body.scrollWidth;
-        var maxPages = Math.ceil((totalSize - pageSize) / pageSize);
-        
-        if (progress >= 0.99 || maxPages <= 0) {
+        if (progress >= 0.99) {
+            var lastPage = Math.floor(maxScroll / pageSize) * pageSize;
+            lastPage = Math.max(0, lastPage);
             if (vertical) {
-                window.scrollTo(0, maxPages * pageSize);
+                scrollEl.scrollTop = lastPage;
+                window.scrollTo(0, lastPage);
             } else {
-                window.scrollTo(maxPages * pageSize, 0);
+                scrollEl.scrollLeft = lastPage;
+                window.scrollTo(lastPage, 0);
             }
+            requestAnimationFrame(() => {
+                if (vertical) {
+                    scrollEl.scrollTop = lastPage;
+                    window.scrollTo(0, lastPage);
+                } else {
+                    scrollEl.scrollLeft = lastPage;
+                    window.scrollTo(lastPage, 0);
+                }
+            });
+            notifyComplete();
             return;
         }
         
-        var low = 0;
-        var high = maxPages;
+        var walker = this.createWalker();
+        var totalChars = 0;
+        var node;
         
-        while (low < high) {
-            var mid = Math.floor((low + high) / 2);
+        while (node = walker.nextNode()) {
+            totalChars += this.countChars(node.textContent);
+        }
+        
+        if (totalChars <= 0) {
+            notifyComplete();
+            return;
+        }
+        
+        var targetCharCount = Math.ceil(totalChars * progress);
+        var runningSum = 0;
+        var targetNode = null;
+        
+        walker = this.createWalker();
+        while (node = walker.nextNode()) {
+            runningSum += this.countChars(node.textContent);
+            if (runningSum > targetCharCount) {
+                targetNode = node;
+                break;
+            }
+        }
+        
+        if (targetNode) {
+            var range = document.createRange();
+            range.setStart(targetNode, 0);
+            range.setEnd(targetNode, 1);
+            var rect = range.getBoundingClientRect();
+            var anchor = (vertical ? rect.top : rect.left) + (vertical ? scrollEl.scrollTop : scrollEl.scrollLeft);
+            var pageIndex = Math.floor(anchor / pageSize);
+            var targetScroll = Math.min(pageIndex * pageSize, maxScroll);
             if (vertical) {
-                window.scrollTo(0, mid * pageSize);
+                scrollEl.scrollTop = targetScroll;
+                window.scrollTo(0, targetScroll);
             } else {
-                window.scrollTo(mid * pageSize, 0);
+                scrollEl.scrollLeft = targetScroll;
+                window.scrollTo(targetScroll, 0);
             }
-            
-            var currentProgress = this.calculateProgress();
-            
-            if (currentProgress < progress) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
+            requestAnimationFrame(() => {
+                if (vertical) {
+                    scrollEl.scrollTop = targetScroll;
+                    window.scrollTo(0, targetScroll);
+                } else {
+                    scrollEl.scrollLeft = targetScroll;
+                    window.scrollTo(targetScroll, 0);
+                }
+            });
         }
-        
-        if (vertical) {
-            window.scrollTo(0, low * pageSize);
-        } else {
-            window.scrollTo(low * pageSize, 0);
-        }
+        notifyComplete();
     },
     
     getSentence(startNode, startOffset) {

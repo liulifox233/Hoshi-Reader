@@ -41,6 +41,7 @@ struct ReaderWebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "textSelected")
+        config.userContentController.add(context.coordinator, name: "restoreCompleted")
         
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
@@ -88,6 +89,7 @@ struct ReaderWebView: UIViewRepresentable {
     
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "textSelected")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "restoreCompleted")
     }
     
     class Coordinator: NSObject, WKNavigationDelegate, UIGestureRecognizerDelegate, WKScriptMessageHandler {
@@ -100,6 +102,12 @@ struct ReaderWebView: UIViewRepresentable {
         }
         
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "restoreCompleted" {
+                UIView.animate(withDuration: 0.25) {
+                    message.webView?.alpha = 1
+                }
+                return
+            }
             guard message.name == "textSelected",
                   let body = message.body as? [String: Any] else {
                 return
@@ -333,11 +341,7 @@ struct ReaderWebView: UIViewRepresentable {
             })();
             """
             
-            webView.evaluateJavaScript(script) { _, _ in
-                UIView.animate(withDuration: 0.3) {
-                    webView.alpha = 1
-                }
-            }
+            webView.evaluateJavaScript(script, completionHandler: nil)
         }
         
         private func navigate(_ direction: NavigationDirection) {
@@ -367,12 +371,13 @@ struct ReaderWebView: UIViewRepresentable {
             if isVertical {
                 let pageHeight = Int(parent.viewSize.height)
                 if direction == .forward {
-                    let padding = parent.userConfig.verticalPadding
                     return """
                     (function() {
                         var pageHeight = \(pageHeight);
-                        var maxScroll = (\(padding) === 0) ? document.body.scrollHeight : document.body.scrollHeight - pageHeight;
-                        if ((window.scrollY + pageHeight) <= (maxScroll - 1)) {
+                        var totalSize = document.body.scrollHeight;
+                        var maxScroll = Math.max(0, totalSize - pageHeight);
+                        var maxAlignedScroll = Math.floor(maxScroll / pageHeight) * pageHeight;
+                        if ((window.scrollY + pageHeight) <= (maxAlignedScroll + 1)) {
                             window.scrollBy(0, pageHeight);
                             return "scrolled";
                         }
@@ -394,12 +399,13 @@ struct ReaderWebView: UIViewRepresentable {
             } else {
                 let pageWidth = Int(parent.viewSize.width)
                 if direction == .forward {
-                    let padding = parent.userConfig.horizontalPadding
                     return """
                     (function() {
                         var pageWidth = \(pageWidth);
-                        var maxScroll = (\(padding) === 0) ? document.body.scrollWidth : document.body.scrollWidth - pageWidth;
-                        if ((window.scrollX + pageWidth) <= (maxScroll - 1)) {
+                        var totalSize = document.body.scrollWidth;
+                        var maxScroll = Math.max(0, totalSize - pageWidth);
+                        var maxAlignedScroll = Math.floor(maxScroll / pageWidth) * pageWidth;
+                        if ((window.scrollX + pageWidth) <= (maxAlignedScroll + 1)) {
                             window.scrollBy(pageWidth, 0);
                             return "scrolled";
                         }
