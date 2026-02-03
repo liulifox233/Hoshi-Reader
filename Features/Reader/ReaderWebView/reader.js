@@ -62,6 +62,35 @@ window.hoshiReader = {
         return totalChars > 0 ? exploredChars / totalChars : 0;
     },
     
+    registerSnapScroll(initialScroll) {
+        if (window.snapScrollRegistered) {
+            return;
+        }
+        window.snapScrollRegistered = true;
+        window.lastPageScroll = initialScroll;
+        
+        var vertical = window.getComputedStyle(document.body).writingMode === "vertical-rl";
+        window.addEventListener('scroll', function() {
+            if (vertical) {
+                var pageHeight = window.innerHeight;
+                var snappedScroll = Math.round(window.scrollY / pageHeight) * pageHeight;
+                if (Math.abs(window.scrollY - snappedScroll) > 1) {
+                    window.scrollTo(0, window.lastPageScroll);
+                } else {
+                    window.lastPageScroll = snappedScroll;
+                }
+            } else {
+                var pageWidth = window.innerWidth;
+                var snappedScroll = Math.round(window.scrollX / pageWidth) * pageWidth;
+                if (Math.abs(window.scrollX - snappedScroll) > 1) {
+                    window.scrollTo(window.lastPageScroll, 0);
+                } else {
+                    window.lastPageScroll = snappedScroll;
+                }
+            }
+        }, { passive: true });
+    },
+    
     restoreProgress(progress) {
         var notifyComplete = () => window.webkit?.messageHandlers?.restoreCompleted?.postMessage(null);
         var vertical = window.getComputedStyle(document.body).writingMode === "vertical-rl";
@@ -71,6 +100,7 @@ window.hoshiReader = {
         var maxScroll = Math.max(0, totalSize - pageSize);
         
         if (pageSize <= 0) {
+            this.registerSnapScroll(0);
             notifyComplete();
             return;
         }
@@ -83,6 +113,7 @@ window.hoshiReader = {
                 scrollEl.scrollLeft = 0;
                 window.scrollTo(0, 0);
             }
+            this.registerSnapScroll(0);
             notifyComplete();
             return;
         }
@@ -97,15 +128,7 @@ window.hoshiReader = {
                 scrollEl.scrollLeft = lastPage;
                 window.scrollTo(lastPage, 0);
             }
-            requestAnimationFrame(() => {
-                if (vertical) {
-                    scrollEl.scrollTop = lastPage;
-                    window.scrollTo(0, lastPage);
-                } else {
-                    scrollEl.scrollLeft = lastPage;
-                    window.scrollTo(lastPage, 0);
-                }
-            });
+            this.registerSnapScroll(lastPage);
             notifyComplete();
             return;
         }
@@ -119,6 +142,7 @@ window.hoshiReader = {
         }
         
         if (totalChars <= 0) {
+            this.registerSnapScroll(0);
             notifyComplete();
             return;
         }
@@ -144,6 +168,7 @@ window.hoshiReader = {
             var anchor = (vertical ? rect.top : rect.left) + (vertical ? scrollEl.scrollTop : scrollEl.scrollLeft);
             var pageIndex = Math.floor(anchor / pageSize);
             var targetScroll = Math.min(pageIndex * pageSize, maxScroll);
+            
             if (vertical) {
                 scrollEl.scrollTop = targetScroll;
                 window.scrollTo(0, targetScroll);
@@ -159,7 +184,10 @@ window.hoshiReader = {
                     scrollEl.scrollLeft = targetScroll;
                     window.scrollTo(targetScroll, 0);
                 }
+                window.hoshiReader.registerSnapScroll(targetScroll);
             });
+        } else {
+            this.registerSnapScroll(0);
         }
         notifyComplete();
     },

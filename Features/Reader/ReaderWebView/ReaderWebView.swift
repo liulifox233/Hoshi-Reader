@@ -244,36 +244,6 @@ struct ReaderWebView: UIViewRepresentable {
                 }
             }()
             
-            let snapScrollJs: String = {
-                if parent.userConfig.verticalWriting {
-                    return """
-                    var lastPageScroll = 0;
-                    window.addEventListener('scroll', function() {
-                        var pageHeight = window.innerHeight;
-                        var snappedScroll = Math.round(window.scrollY / pageHeight) * pageHeight;
-                        if (Math.abs(window.scrollY - snappedScroll) > 1) {
-                            window.scrollTo(0, lastPageScroll);
-                        } else {
-                            lastPageScroll = snappedScroll;
-                        }
-                    }, { passive: true });
-                    """
-                } else {
-                    return """
-                    var lastPageScroll = 0;
-                    window.addEventListener('scroll', function() {
-                        var pageWidth = window.innerWidth;
-                        var snappedScroll = Math.round(window.scrollX / pageWidth) * pageWidth;
-                        if (Math.abs(window.scrollX - snappedScroll) > 1) {
-                            window.scrollTo(lastPageScroll, 0);
-                        } else {
-                            lastPageScroll = snappedScroll;
-                        }
-                    }, { passive: true });
-                    """
-                }
-            }()
-            
             let script = """
             (function() {
                 var viewport = document.querySelector('meta[name="viewport"]');
@@ -309,8 +279,6 @@ struct ReaderWebView: UIViewRepresentable {
                         }
                     });
                 });
-                
-                \(snapScrollJs)
                 
                 // apply style to big images only, some epubs have inline pictures as "text"
                 var images = document.querySelectorAll('img');
