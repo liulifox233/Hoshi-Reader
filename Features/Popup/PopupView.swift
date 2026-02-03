@@ -208,12 +208,16 @@ struct PopupView: View {
         let styles = (try? JSONEncoder().encode(dictionaryStyles)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         let entriesJson = (try? JSONEncoder().encode(entries)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         
+        let audioSources = (try? JSONEncoder().encode(userConfig.enabledAudioSources))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        
         return """
         <script>
             window.dictionaryStyles = \(styles);
             window.lookupEntries = \(entriesJson);
             window.collapseDictionaries = \(userConfig.collapseDictionaries);
             window.compactGlossaries = \(userConfig.compactGlossaries);
+            window.audioSources = \(audioSources);
         </script>
         <div id="entries-container"></div>
         """

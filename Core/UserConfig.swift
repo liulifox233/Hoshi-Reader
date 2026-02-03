@@ -39,7 +39,7 @@ class UserConfig {
     var collapseDictionaries: Bool {
         didSet { UserDefaults.standard.set(collapseDictionaries, forKey: "collapseDictionaries") }
     }
-
+    
     var compactGlossaries: Bool {
         didSet { UserDefaults.standard.set(compactGlossaries, forKey: "compactGlossaries") }
     }
@@ -119,7 +119,25 @@ class UserConfig {
     var popupHeight: Int {
         didSet { UserDefaults.standard.set(popupHeight, forKey: "popupHeight") }
     }
-
+    
+    var audioSources: [AudioSource] {
+        didSet {
+            if let data = try? JSONEncoder().encode(audioSources) {
+                UserDefaults.standard.set(data, forKey: "audioSources")
+            }
+        }
+    }
+    
+    var enabledAudioSources: [String] {
+        audioSources.filter { $0.isEnabled }.map { $0.url }
+    }
+    
+    static let defaultAudioSource = AudioSource(
+        url: "https://hoshi-reader.manhhaoo-do.workers.dev/?term={term}&reading={reading}",
+        isEnabled: true,
+        isDefault: true
+    )
+    
     init() {
         let defaults = UserDefaults.standard
         
@@ -155,6 +173,13 @@ class UserConfig {
         
         self.popupWidth = defaults.object(forKey: "popupWidth") as? Int ?? 320
         self.popupHeight = defaults.object(forKey: "popupHeight") as? Int ?? 250
+        
+        if let data = defaults.data(forKey: "audioSources"),
+           let sources = try? JSONDecoder().decode([AudioSource].self, from: data) {
+            self.audioSources = sources
+        } else {
+            self.audioSources = [UserConfig.defaultAudioSource]
+        }
     }
     
     private static func saveColor(_ color: Color, key: String) {

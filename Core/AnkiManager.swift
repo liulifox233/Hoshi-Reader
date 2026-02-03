@@ -156,6 +156,8 @@ class AnkiManager {
                     value = content["selectionText"] ?? ""
                 case .bookCover:
                     value = coverPath ?? ""
+                case .audio:
+                    value = content["audio"] ?? ""
                 }
             } else {
                 value = ""

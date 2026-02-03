@@ -16,7 +16,7 @@ struct BookshelfView: View {
     @State private var showDictionaries = false
     @State private var showAnkiSettings = false
     @State private var showAppearance = false
-    @State private var showSync = false
+    @State private var showAdvanced = false
     @State private var showDictionarySearch = false
     
     private let columns = [
@@ -51,8 +51,8 @@ struct BookshelfView: View {
             .navigationDestination(isPresented: $showAnkiSettings) {
                 AnkiView()
             }
-            .navigationDestination(isPresented: $showSync) {
-                SyncView()
+            .navigationDestination(isPresented: $showAdvanced) {
+                AdvancedView()
             }
             .navigationDestination(isPresented: $showDictionarySearch) {
                 DictionarySearchView()
@@ -125,14 +125,14 @@ struct BookshelfView: View {
                     Label("Anki", systemImage: "tray.full")
                 }
                 Button {
-                    showSync = true
-                } label: {
-                    Label("ッツ Sync", systemImage: "cloud")
-                }
-                Button {
                     showAppearance = true
                 } label: {
                     Label("Appearance", systemImage: "paintbrush.pointed")
+                }
+                Button {
+                    showAdvanced = true
+                } label: {
+                    Label("Advanced", systemImage: "gearshape.2")
                 }
             } label: {
                 Image(systemName: "gearshape")

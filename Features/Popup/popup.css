@@ -41,8 +41,15 @@ body {
     -webkit-user-select: none;
 }
 
-.mine-button {
+.header-buttons {
+    display: flex;
+    align-items: center;
     margin-left: auto;
+    gap: 6px;
+}
+
+.audio-button,
+.mine-button {
     padding: 0 4px;
     border: none;
     background: transparent;
@@ -50,7 +57,10 @@ body {
     font-size: 18px;
     opacity: 0.3;
     -webkit-user-select: none;
-    line-height: 1;
+}
+
+.audio-button {
+    transform: translateY(1px);
 }
 
 .entry-tags {

@@ -9,9 +9,59 @@
 import SwiftUI
 import WebKit
 
+class ProxyHandler: NSObject, WKURLSchemeHandler {
+    func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
+        guard let requestUrl = task.request.url,
+              let components = URLComponents(url: requestUrl, resolvingAgainstBaseURL: false),
+              let targetUrlString = components.queryItems?.first(where: { $0.name == "url" })?.value,
+              let targetUrl = URL(string: targetUrlString) else {
+            task.didFailWithError(URLError(.badURL))
+            return
+        }
+
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: targetUrl)
+                let response = HTTPURLResponse(
+                    url: requestUrl,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Access-Control-Allow-Origin": "*",
+                        "Content-Type": "application/json"
+                    ]
+                )!
+                task.didReceive(response)
+                task.didReceive(data)
+                task.didFinish()
+            } catch {
+                task.didFailWithError(error)
+            }
+        }
+    }
+
+    func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
+}
+
 struct PopupWebView: UIViewRepresentable {
     let content: String
     var onMine: (([String: String]) -> Void)? = nil
+    
+    private static let popupJs: String = {
+        guard let url = Bundle.main.url(forResource: "popup", withExtension: "js"),
+              let js = try? String(contentsOf: url, encoding: .utf8) else {
+            return ""
+        }
+        return js
+    }()
+    
+    private static let popupCss: String = {
+        guard let url = Bundle.main.url(forResource: "popup", withExtension: "css"),
+              let css = try? String(contentsOf: url, encoding: .utf8) else {
+            return ""
+        }
+        return css
+    }()
     
     func makeCoordinator() -> Coordinator {
         Coordinator(onMine: onMine)
@@ -21,6 +71,7 @@ struct PopupWebView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mineEntry")
         config.userContentController.add(context.coordinator, name: "openLink")
+        config.setURLSchemeHandler(ProxyHandler(), forURLScheme: "proxy")
         
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
@@ -40,11 +91,16 @@ struct PopupWebView: UIViewRepresentable {
         }
     }
     
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.evaluateJavaScript("stopAudio()")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "openLink")
+    }
+    
     class Coordinator: NSObject, WKScriptMessageHandler {
         var onMine: (([String: String]) -> Void)?
         var currentContent: String = ""
         
-        // refresh onMine otherwise we have stale sentence data
         init(onMine: (([String: String]) -> Void)?) {
             self.onMine = onMine
         }
@@ -60,30 +116,14 @@ struct PopupWebView: UIViewRepresentable {
         }
     }
     
-    private var popupJs: String {
-        guard let url = Bundle.main.url(forResource: "popup", withExtension: "js"),
-              let js = try? String(contentsOf: url, encoding: .utf8) else {
-            return ""
-        }
-        return js
-    }
-    
-    private var popupCss: String {
-        guard let url = Bundle.main.url(forResource: "popup", withExtension: "css"),
-              let css = try? String(contentsOf: url, encoding: .utf8) else {
-            return ""
-        }
-        return css
-    }
-    
     private func buildHTML(content: String) -> String {
         """
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>\(popupCss)</style>
-            <script>\(popupJs)</script>
+            <style>\(Self.popupCss)</style>
+            <script>\(Self.popupJs)</script>
         </head>
         <body>
             \(content)

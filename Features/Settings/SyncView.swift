@@ -18,7 +18,7 @@ struct SyncView: View {
         @Bindable var userConfig = userConfig
         List {
             Section {
-                Toggle("Enable Sync", isOn: $userConfig.enableSync)
+                Toggle("Enable", isOn: $userConfig.enableSync)
             } footer: {
                 Text("A [Google Cloud project](https://github.com/ttu-ttu/ebook-reader?tab=readme-ov-file#storage-sources) is necessary for syncing with ッツ Reader.\nAfter the intial setup, create another OAuth client ID in the same project, select iOS as the Application type and set the Bundle ID to 'de.manhhao.hoshi'. Paste the Client ID in the textbox below and and press on 'Sign in with Google'.\nYou can now sync individual books by long-pressing and selecting 'Sync'.")
             }
@@ -32,7 +32,7 @@ struct SyncView: View {
                     HStack {
                         Text("Status")
                         Spacer()
-                        Text(isAuthenticated ? "Signed in" : "Not signed in")
+                        Text(isAuthenticated ? "Connected" : "Not connected")
                             .foregroundStyle(.secondary)
                     }
                     if isAuthenticated {
@@ -54,7 +54,7 @@ struct SyncView: View {
                                 }
                             }
                         } label: {
-                            Text("Sign in with Google")
+                            Text("Connect Google Drive")
                         }
                     }
                 }

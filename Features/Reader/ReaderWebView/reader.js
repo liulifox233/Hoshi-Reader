@@ -229,7 +229,7 @@ window.hoshiReader = {
             if (!pos) {
                 return null;
             }
-
+            
             const range = document.createRange();
             range.setStart(pos.offsetNode, pos.offset);
             range.collapse(true);
