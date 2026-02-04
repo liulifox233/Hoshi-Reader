@@ -315,11 +315,26 @@ class BookshelfViewModel {
     }
     
     private func findCoverInManifest(document: EPUBDocument) -> String? {
+        // EPUB3
+        // <item href="Images/embed0028_HD.jpg" properties="cover-image" id="embed0028_HD" media-type="image/jpeg"/>
         if let coverItem = document.manifest.items.values.first(where: { $0.property?.contains("cover-image") == true }) {
             return coverItem.path
         }
         
+        // EPUB2
+        // <meta name="cover" content="cover"/>
+        // <item id="cover" href="cover.jpeg" media-type="image/jpeg"/>
+        if let coverId = document.metadata.coverId,
+           let coverItem = document.manifest.items[coverId] {
+            return coverItem.path
+        }
+        
+        // fallbacks in case the epub doesn't conform to any standards
         let imageTypes: [EPUBMediaType] = [.jpeg, .png, .gif, .svg]
+        if let coverItem = document.manifest.items.values.first(where: { $0.id.lowercased().contains("cover") }),
+           imageTypes.contains(coverItem.mediaType){
+            return coverItem.path
+        }
         if let firstImage = document.manifest.items.values.first(where: { imageTypes.contains($0.mediaType) }) {
             return firstImage.path
         }
