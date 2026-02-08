@@ -20,6 +20,7 @@ struct BookshelfView: View {
     @State private var showDictionarySearch = false
     @State private var navigationPath = NavigationPath()
     @Binding var pendingImportURL: URL?
+    @Binding var pendingLookup: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 160), spacing: 20)
@@ -49,8 +50,17 @@ struct BookshelfView: View {
                     pendingImportURL = nil
                 }
             }
+            .onChange(of: pendingLookup) { _, text in
+                if let text {
+                    navigationPath.append(LookupDestination(query: text))
+                    pendingLookup = nil
+                }
+            }
             .navigationDestination(for: BookMetadata.self) { book in
                 ReaderLoader(book: book)
+            }
+            .navigationDestination(for: LookupDestination.self) { dest in
+                DictionarySearchView(initialQuery: dest.query)
             }
             .fileImporter(
                 isPresented: $viewModel.isImporting,
@@ -189,4 +199,8 @@ struct BookCell: View {
             }
         }
     }
+}
+
+struct LookupDestination: Hashable {
+    let query: String
 }

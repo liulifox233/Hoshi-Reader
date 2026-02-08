@@ -15,6 +15,7 @@ struct DictionarySearchView: View {
     @State private var lastQuery: String = ""
     @State private var content: String = ""
     @State private var hasSearched = false
+    var initialQuery: String = ""
     
     var body: some View {
         PopupWebView(
@@ -27,7 +28,15 @@ struct DictionarySearchView: View {
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea()
         .overlay(alignment: .bottom){
-            DictionarySearchBar(text: $query) {
+            if initialQuery.isEmpty {
+                DictionarySearchBar(text: $query) {
+                    runLookup()
+                }
+            }
+        }
+        .onAppear {
+            if !initialQuery.isEmpty {
+                query = initialQuery
                 runLookup()
             }
         }

@@ -14,6 +14,7 @@ struct HoshiReaderApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var userConfig = UserConfig()
     @State private var pendingImportURL: URL?
+    @State private var pendingLookup: String?
     
     init() {
         WebViewPreloader.shared.warmup()
@@ -22,7 +23,7 @@ struct HoshiReaderApp: App {
     
     var body: some Scene {
         WindowGroup {
-            BookshelfView(pendingImportURL: $pendingImportURL)
+            BookshelfView(pendingImportURL: $pendingImportURL, pendingLookup: $pendingLookup)
                 .environment(userConfig)
                 .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : userConfig.theme.colorScheme)
                 .onChange(of: scenePhase, initial: true) { _, phase in
@@ -51,6 +52,12 @@ struct HoshiReaderApp: App {
                 AnkiManager.shared.fetch()
             } else if url.host == "ankiSuccess" {
                 LocalFileServer.shared.clearCover()
+            } else if url.host == "search" {
+                if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                   let text = components.queryItems?.first(where: { $0.name == "text" })?.value,
+                   !text.isEmpty {
+                    pendingLookup = text
+                }
             }
         } else if url.isFileURL {
             pendingImportURL = url
