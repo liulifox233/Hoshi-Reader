@@ -9,7 +9,6 @@
 import SwiftUI
 
 struct ShelfView: View {
-    @Namespace private var namespace
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(UserConfig.self) var userConfig
     @State private var selectedBook: BookMetadata?
@@ -106,7 +105,6 @@ struct ShelfView: View {
                             isSelecting: isSelecting,
                             selectedBooks: $selectedBooks
                         )
-                        .matchedTransitionSource(id: book.id, in: namespace)
                     }
                 }
                 .padding(.horizontal)
@@ -114,7 +112,6 @@ struct ShelfView: View {
         }
         .fullScreenCover(item: $selectedBook) { book in
             ReaderLoader(book: book)
-                .navigationTransition(.zoom(sourceID: book.id, in: namespace))
                 .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : (userConfig.theme.colorScheme ?? systemColorScheme))
         }
         .onChange(of: selectedBook) { old, new in
