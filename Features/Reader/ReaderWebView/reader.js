@@ -8,6 +8,7 @@
 
 window.hoshiReader = {
     selection: null,
+    currentSentenceRange: null,
     scanDelimiters: '。、！？…‥「」『』（）()【】〈〉《》〔〕｛｝{}［］[]・：；:;，,.─\n\r',
     sentenceDelimiters: '。！？.!?\n\r',
     ttuRegex: /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu,
@@ -27,7 +28,7 @@ window.hoshiReader = {
     
     findParagraph(node) {
         let el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
-        return el?.closest('p') || null;
+        return el?.closest('p, div, li, dd, dt, h1, h2, h3, h4, h5, h6') || document.body;
     },
     
     countChars(text) {
@@ -36,7 +37,6 @@ window.hoshiReader = {
     
     createWalker(rootNode) {
         const root = rootNode || document.body;
-        
         return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
             acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
         });
@@ -236,261 +236,288 @@ window.hoshiReader = {
         notifyComplete();
     },
     
-    getSentence(startNode, startOffset) {
-        const container = this.findParagraph(startNode) || document.body;
-        const walker = this.createWalker(container);
-        
-        walker.currentNode = startNode;
-        const partsBefore = [];
-        let node = startNode;
-        let limit = startOffset;
-        
-        while (node) {
-            const text = node.textContent;
-            let foundStart = false;
-            for (let i = limit - 1; i >= 0; i--) {
-                if (this.sentenceDelimiters.includes(text[i])) {
-                    partsBefore.push(text.slice(i + 1, limit));
-                    foundStart = true;
-                    break;
-                }
-            }
-            
-            if (foundStart) {
-                break;
-            }
-            
-            partsBefore.push(text.slice(0, limit));
-            node = walker.previousNode();
-            if (node) limit = node.textContent.length;
-        }
-        
-        walker.currentNode = startNode;
-        const partsAfter = [];
-        node = startNode;
-        let start = startOffset;
-        
-        while (node) {
-            const text = node.textContent;
-            let foundEnd = false;
-            
-            for (let i = start; i < text.length; i++) {
-                if (this.sentenceDelimiters.includes(text[i])) {
-                    partsAfter.push(text.slice(start, i + 1));
-                    foundEnd = true;
-                    break;
-                }
-            }
-            
-            if (foundEnd) {
-                break;
-            }
-            
-            partsAfter.push(text.slice(start));
-            
-            node = walker.nextNode();
-            start = 0;
-        }
-        
-        return (partsBefore.reverse().join('') + partsAfter.join('')).trim();
-    },
-    
     getCaretRange(x, y) {
         if (document.caretPositionFromPoint) {
             const pos = document.caretPositionFromPoint(x, y);
-            if (!pos) {
-                return null;
+            if (pos) {
+                const range = document.createRange();
+                range.setStart(pos.offsetNode, pos.offset);
+                range.collapse(true);
+                return range;
             }
-            
-            const range = document.createRange();
-            range.setStart(pos.offsetNode, pos.offset);
-            range.collapse(true);
-            return range;
-        } else {
-            const element = document.elementFromPoint(x, y);
-            if (!element) {
-                return null;
-            }
-            
-            const container = element.closest('p, div, span, ruby, a') || document.body;
-            const walker = this.createWalker(container);
-            
-            const range = document.createRange();
-            let node;
-            while (node = walker.nextNode()) {
-                for (let i = 0; i < node.textContent.length; i++) {
-                    range.setStart(node, i);
-                    range.setEnd(node, i + 1);
-                    const rect = range.getBoundingClientRect();
-                    if (rect.left <= x && x <= rect.right && rect.top <= y && y <= rect.bottom) {
-                        range.collapse(true);
-                        return range;
-                    }
+        }
+        
+        if (!this.isVertical() && document.caretRangeFromPoint) {
+            const range = document.caretRangeFromPoint(x, y);
+            if (range) {
+                const rect = range.getBoundingClientRect();
+                const dist = Math.hypot(rect.x - x, rect.y - y);
+                if (dist < 50) {
+                    return range;
                 }
             }
-            return document.caretRangeFromPoint(x, y);
         }
+        
+        const element = document.elementFromPoint(x, y);
+        if (!element) return null;
+        
+        const ignoreTags = ['BODY', 'HTML', 'ARTICLE', 'SECTION'];
+        if (ignoreTags.includes(element.tagName)) {
+            return null;
+        }
+        
+        const container = element.closest('p, div, span, ruby, a') || document.body;
+        const walker = this.createWalker(container);
+        const range = document.createRange();
+        let node;
+        
+        const PAD = 4;
+        
+        while (node = walker.nextNode()) {
+            const len = node.textContent.length;
+            for (let i = 0; i < len; i++) {
+                range.setStart(node, i);
+                range.setEnd(node, i + 1);
+                const rect = range.getBoundingClientRect();
+                
+                if (rect.left - PAD <= x && x <= rect.right + PAD &&
+                    rect.top - PAD <= y && y <= rect.bottom + PAD) {
+                    range.collapse(true);
+                    return range;
+                }
+            }
+        }
+        
+        return document.caretRangeFromPoint(x, y);
     },
     
     getCharacterAtPoint(x, y) {
-        const range = this.getCaretRange(x, y);
-        if (!range) {
-            return null;
-        }
+        let range = document.caretRangeFromPoint(x, y);
+        if (!range) return null;
         
-        const node = range.startContainer;
-        if (node.nodeType !== Node.TEXT_NODE) {
-            return null;
-        }
+        let node = range.startContainer;
+        let offset = range.startOffset;
         
         if (this.isFurigana(node)) {
+            const ruby = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node).closest('ruby');
+            if (ruby) {
+                const walker = document.createTreeWalker(ruby, NodeFilter.SHOW_TEXT, {
+                    acceptNode: (n) => this.isFurigana(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT
+                });
+                const firstBaseNode = walker.nextNode();
+                if (firstBaseNode) {
+                    node = firstBaseNode;
+                    offset = 0;
+                    range = document.createRange();
+                    range.setStart(node, offset);
+                    range.setEnd(node, offset + 1);
+                }
+            }
+        }
+        
+        if (node.nodeType === Node.TEXT_NODE && offset >= node.textContent.length) {
+            offset = Math.max(0, node.textContent.length - 1);
+        }
+        
+        if (node.nodeType !== Node.TEXT_NODE || offset < 0) return null;
+        
+        const charRange = document.createRange();
+        charRange.setStart(node, offset);
+        charRange.setEnd(node, Math.min(offset + 1, node.textContent.length));
+        const rect = charRange.getBoundingClientRect();
+        
+        const threshold = 15;
+        const isOutOfBounds = (
+                               x < rect.left - threshold ||
+                               x > rect.right + threshold ||
+                               y < rect.top - threshold ||
+                               y > rect.bottom + threshold
+                               );
+        
+        if (isOutOfBounds) {
             return null;
         }
         
-        const text = node.textContent;
-        const caret = range.startOffset;
-        
-        for (const offset of [caret, caret - 1, caret + 1]) {
-            if (offset < 0 || offset >= text.length) {
-                continue;
-            }
-            
-            const charRange = document.createRange();
-            charRange.setStart(node, offset);
-            charRange.setEnd(node, offset + 1);
-            const rect = charRange.getBoundingClientRect();
-            
-            const inside = x >= rect.left && x <= rect.right
-            && y >= rect.top && y <= rect.bottom;
-            
-            if (inside) {
-                if (this.isScanBoundary(text[offset])) {
-                    return null;
-                }
-                return { node, offset };
-            }
+        const char = node.textContent[offset];
+        if (this.isScanBoundary(char)) {
+            return null;
         }
         
-        return null;
+        return { node, offset };
     },
     
-    selectText(x, y, maxLength) {
-        const hit = this.getCharacterAtPoint(x, y);
-        
-        if (!hit) {
-            this.clearHighlight();
-            return null;
-        }
-        
-        // Dismiss popup if tapping on the first character of the current selection
-        if (this.selection &&
-            hit.node === this.selection.startNode &&
-            hit.offset === this.selection.startOffset) {
-            this.clearHighlight();
-            return null;
-        }
-        
-        this.clearHighlight();
-        
-        const container = this.findParagraph(hit.node) || document.body;
+    getSentenceRange(startNode, startOffset) {
+        const container = this.findParagraph(startNode) || document.body;
         const walker = this.createWalker(container);
         
-        let text = '';
-        let node = hit.node;
-        let offset = hit.offset;
-        let ranges = [];
+        const nodes = [];
+        let node;
+        while(node = walker.nextNode()) {
+            nodes.push(node);
+        }
+        if (nodes.length === 0) return null;
         
-        walker.currentNode = node;
-        while (text.length < maxLength && node) {
-            const content = node.textContent;
-            const start = offset;
-            
-            while (offset < content.length && text.length < maxLength) {
-                const char = content[offset];
-                if (this.isScanBoundary(char)) {
-                    break;
-                }
-                text += char;
-                offset++;
+        let fullText = "";
+        let globalClickIndex = -1;
+        let currentLen = 0;
+        
+        for (const n of nodes) {
+            const txt = n.textContent;
+            if (n === startNode) {
+                globalClickIndex = currentLen + startOffset;
             }
-            
-            if (offset > start) {
-                ranges.push({ node, start, end: offset });
-            }
-            
-            if (offset < content.length || text.length >= maxLength) {
-                break;
-            }
-            
-            node = walker.nextNode();
-            offset = 0;
+            currentLen += txt.length;
+            fullText += txt;
         }
         
-        if (!text) {
+        if (globalClickIndex === -1) return null;
+        
+        let startIndex = 0;
+        let endIndex = fullText.length;
+        
+        for (let i = globalClickIndex - 1; i >= 0; i--) {
+            if (this.sentenceDelimiters.includes(fullText[i])) {
+                startIndex = i + 1;
+                break;
+            }
+        }
+        
+        for (let i = globalClickIndex; i < fullText.length; i++) {
+            if (this.sentenceDelimiters.includes(fullText[i])) {
+                endIndex = i + 1;
+                break;
+            }
+        }
+        
+        const sentenceText = fullText.substring(startIndex, endIndex);
+        
+        let rangeStartNode = null, rangeStartOffset = 0;
+        let rangeEndNode = null, rangeEndOffset = 0;
+        let scanIndex = 0;
+        
+        for (const n of nodes) {
+            const len = n.textContent.length;
+            const nodeStart = scanIndex;
+            const nodeEnd = scanIndex + len;
+            
+            if (!rangeStartNode && startIndex >= nodeStart && startIndex < nodeEnd) {
+                rangeStartNode = n;
+                rangeStartOffset = startIndex - nodeStart;
+            }
+            
+            if (!rangeEndNode && endIndex > nodeStart && endIndex <= nodeEnd) {
+                rangeEndNode = n;
+                rangeEndOffset = endIndex - nodeStart;
+            }
+            scanIndex += len;
+        }
+        
+        if (!rangeStartNode || !rangeEndNode) return null;
+        
+        const sentenceRange = document.createRange();
+        sentenceRange.setStart(rangeStartNode, rangeStartOffset);
+        sentenceRange.setEnd(rangeEndNode, rangeEndOffset);
+        
+        const preCaretRange = document.createRange();
+        preCaretRange.setStart(rangeStartNode, rangeStartOffset);
+        preCaretRange.setEnd(startNode, startOffset);
+        
+        let relativeClickIndex = globalClickIndex - startIndex;
+        return {
+            range: sentenceRange,
+            text: sentenceText,
+            index: relativeClickIndex
+        };
+    },
+    
+    selectText(x, y) {
+        this.clearHighlight();
+        
+        const hit = this.getCharacterAtPoint(x, y);
+        if (!hit) {
+            this.clearHighlight();
+            window.webkit?.messageHandlers?.textSelected?.postMessage(null);
             return null;
         }
         
-        this.selection = {
-            startNode: hit.node,
-            startOffset: hit.offset,
-            ranges,
-            text
-        };
+        const result = this.getSentenceRange(hit.node, hit.offset);
+        if (!result) {
+            window.webkit?.messageHandlers?.textSelected?.postMessage(null);
+            return null;
+        }
         
-        const sentence = this.getSentence(hit.node, hit.offset);
-        webkit.messageHandlers.textSelected.postMessage({
-            text,
-            sentence,
-            rect: this.getSelectionRect()
+        this.currentSentenceRange = result.range;
+        
+        const clickRange = document.createRange();
+        clickRange.setStart(hit.node, hit.offset);
+        clickRange.setEnd(hit.node, hit.offset + 1);
+        const rect = clickRange.getBoundingClientRect();
+        
+        window.webkit.messageHandlers.textSelected.postMessage({
+            sentence: result.text,
+            index: result.index,
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
         });
         
-        return text;
+        return result.text;
     },
     
-    getSelectionRect() {
-        if (!this.selection?.ranges.length) {
-            return null;
-        }
+    highlightRange(startOffset, length) {
+        if (!this.currentSentenceRange) return;
         
-        const first = this.selection.ranges[0];
-        const range = document.createRange();
-        range.setStart(first.node, first.start);
-        range.setEnd(first.node, first.start + 1);
+        const baseRange = this.currentSentenceRange;
+        const walker = this.createWalker(baseRange.commonAncestorContainer);
         
-        const rect = range.getBoundingClientRect();
-        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-    },
-    
-    highlightSelection(charCount) {
-        if (!this.selection?.ranges.length) {
-            return;
-        }
+        walker.currentNode = baseRange.startContainer;
         
         const highlights = [];
-        let remaining = charCount;
+        let node = baseRange.startContainer;
+        let currentScanIndex = 0;
+        let remainingLength = length;
+        let indexInNode = baseRange.startOffset;
         
-        for (const r of this.selection.ranges) {
-            if (remaining <= 0) {
-                break;
+        while (node && remainingLength > 0) {
+            let nodeEndIndex = node.length;
+            if (node === baseRange.endContainer) {
+                nodeEndIndex = baseRange.endOffset;
             }
             
-            const length = r.end - r.start;
-            const end = remaining >= length ? r.end : r.start + remaining;
+            let charCount = nodeEndIndex - indexInNode;
             
-            const range = document.createRange();
-            range.setStart(r.node, r.start);
-            range.setEnd(r.node, end);
-            highlights.push(range);
+            if (charCount > 0) {
+                let overlapStart = Math.max(currentScanIndex, startOffset);
+                let overlapEnd = Math.min(currentScanIndex + charCount, startOffset + length);
+                
+                if (overlapEnd > overlapStart) {
+                    const r = document.createRange();
+                    let localStart = (overlapStart - currentScanIndex) + indexInNode;
+                    let localEnd = (overlapEnd - currentScanIndex) + indexInNode;
+                    
+                    r.setStart(node, localStart);
+                    r.setEnd(node, localEnd);
+                    highlights.push(r);
+                    
+                    remainingLength -= (overlapEnd - overlapStart);
+                }
+                
+                currentScanIndex += charCount;
+            }
             
-            remaining -= length;
+            if (node === baseRange.endContainer) break;
+            
+            node = walker.nextNode();
+            indexInNode = 0;
         }
         
-        CSS.highlights?.set('hoshi-selection', new Highlight(...highlights));
+        if (highlights.length > 0) {
+            CSS.highlights?.set('hoshi-selection', new Highlight(...highlights));
+        }
     },
     
     clearHighlight() {
         window.getSelection()?.removeAllRanges();
         CSS.highlights?.clear();
+        this.currentSentenceRange = null;
         this.selection = null;
     }
 };

@@ -81,6 +81,7 @@ class ReaderViewModel {
     var sessionStatistics: Statistics
     var todaysStatistics: Statistics
     var allTimeStatistics: Statistics
+    var lastSelectedWord: String? = nil
     
     init(document: EPUBDocument, rootURL: URL, enableStatistics: Bool) {
         self.document = document
@@ -196,19 +197,37 @@ class ReaderViewModel {
         return false
     }
     
-    func handleTextSelection(_ selection: SelectionData, maxResults: Int) -> Int? {
+    func handleTextSelection(_ selection: SelectionData, maxResults: Int) -> (offset: Int, length: Int)? {
+        guard let token = NLPService.shared.findWord(in: selection.sentence, at: selection.index) else {
+            closePopup()
+            return nil
+        }
+        
+        let selectedWord = token.text
+        
+        if showPopup && lastSelectedWord == selectedWord {
+            closePopup()
+            lastSelectedWord = nil
+            return nil
+        }
+        
         currentSelection = selection
-        lookupResults = LookupEngine.shared.lookup(selection.text, maxResults: maxResults)
+        lastSelectedWord = selectedWord
+        
+        lookupResults = LookupEngine.shared.lookup(selectedWord, maxResults: maxResults)
+        
         dictionaryStyles = [:]
         for style in LookupEngine.shared.getStyles() {
             dictionaryStyles[String(style.dict_name)] = String(style.styles)
         }
         
+        
+        
         if let firstResult = lookupResults.first {
             withAnimation(.default.speed(2)) {
                 showPopup = true
             }
-            return String(firstResult.matched).count
+            return (token.rangeOffset, token.rangeLength)
         } else {
             closePopup()
             return nil
@@ -218,6 +237,7 @@ class ReaderViewModel {
     func closePopup() {
         withAnimation(.default.speed(2)) {
             showPopup = false
+            lastSelectedWord = nil
         }
     }
     

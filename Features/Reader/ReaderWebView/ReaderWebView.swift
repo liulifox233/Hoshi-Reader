@@ -16,8 +16,8 @@ private enum NavigationDirection {
 }
 
 struct SelectionData {
-    let text: String
     let sentence: String
+    let index: Int
     let rect: CGRect
 }
 
@@ -31,7 +31,7 @@ struct ReaderWebView: UIViewRepresentable {
     var onNextChapter: () -> Bool
     var onPreviousChapter: () -> Bool
     var onSaveBookmark: (Double) -> Void
-    var onTextSelected: ((SelectionData) -> Int?)?
+    var onTextSelected: ((SelectionData) -> (Int, Int)?)?
     var onTapOutside: (() -> Void)?
     let maxSelectionLength: Int = 16
     
@@ -121,8 +121,8 @@ struct ReaderWebView: UIViewRepresentable {
             }
             else if message.name == "textSelected" {
                 guard let body = message.body as? [String: Any],
-                      let text = body["text"] as? String,
                       let sentence = body["sentence"] as? String,
+                      let index = body["index"] as? Int,
                       let rectData = body["rect"] as? [String: Any],
                       let x = rectData["x"] as? CGFloat,
                       let y = rectData["y"] as? CGFloat,
@@ -131,10 +131,11 @@ struct ReaderWebView: UIViewRepresentable {
                     return
                 }
                 let rect = CGRect(x: x, y: y, width: w, height: h)
-                let selectionData = SelectionData(text: text, sentence: sentence, rect: rect)
                 
-                if let highlightCount = parent.onTextSelected?(selectionData) {
-                    highlightSelection(count: highlightCount)
+                let selectionData = SelectionData(sentence: sentence, index: index, rect: rect)
+                
+                if let (offset, length) = parent.onTextSelected?(selectionData) {
+                    highlightSelection(offset: offset, length: length)
                 }
             }
         }
@@ -395,12 +396,9 @@ struct ReaderWebView: UIViewRepresentable {
             }
         }
         
-        func highlightSelection(count: Int) {
-            guard let webView = webView else {
-                return
-            }
-            
-            webView.evaluateJavaScript("window.hoshiReader.highlightSelection(\(count))") { _, _ in }
+        func highlightSelection(offset: Int, length: Int) {
+            guard let webView = webView else { return }
+            webView.evaluateJavaScript("window.hoshiReader.highlightRange(\(offset), \(length))") { _, _ in }
         }
         
         func clearHighlight() {
