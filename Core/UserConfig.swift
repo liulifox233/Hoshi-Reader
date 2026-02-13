@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import AVFoundation
 
 enum SyncMode: String, CaseIterable, Codable {
     case auto = "Auto"
@@ -243,6 +244,16 @@ class UserConfig {
         self.statisticsEnableSync = defaults.object(forKey: "statisticsEnableSync") as? Bool ?? false
         self.statisticsSyncMode = defaults.string(forKey: "statisticsSyncMode")
             .flatMap(StatisticsSyncMode.init) ?? .merge
+            
+        self.audioSources.removeAll { $0.url == "tts://system" }
+        
+        let voices = TTSManager.shared.getAvailableVoices()
+        for voice in voices {
+            let url = "tts://\(voice.identifier)"
+            if !self.audioSources.contains(where: { $0.url == url }) {
+                self.audioSources.append(AudioSource(name: "TTS: \(voice.name)", url: url, isEnabled: false))
+            }
+        }
     }
     
     private static func saveColor(_ color: Color, key: String) {

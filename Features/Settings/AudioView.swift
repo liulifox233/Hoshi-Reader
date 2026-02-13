@@ -28,7 +28,7 @@ struct AudioView: View {
                         VStack(alignment: .leading) {
                             Text(source.name)
                                 .lineLimit(1)
-                            if !source.isDefault && source.url != UserConfig.localAudioSource.url {
+                            if !source.isDefault && source.url != UserConfig.localAudioSource.url && !source.url.hasPrefix("tts://") {
                                 Text(source.url)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -36,7 +36,7 @@ struct AudioView: View {
                             }
                         }
                     }
-                    .deleteDisabled(source.isDefault || source.url == UserConfig.localAudioSource.url)
+                    .deleteDisabled(source.isDefault || source.url == UserConfig.localAudioSource.url || source.url.hasPrefix("tts://"))
                 }
                 .onDelete { indexSet in
                     userConfig.audioSources.remove(atOffsets: indexSet)

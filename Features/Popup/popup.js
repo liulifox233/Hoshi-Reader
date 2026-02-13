@@ -742,6 +742,10 @@ async function fetchAudioUrl(expression, reading) {
     if (!templates?.length) return null;
 
     for (const template of templates) {
+        if (template.startsWith('tts://')) {
+            return template;
+        }
+        
         const url = template
             .replace('{term}', encodeURIComponent(expression))
             .replace('{reading}', encodeURIComponent(reading));
@@ -761,13 +765,24 @@ function createAudioButton(expression, reading, entryIndex) {
         className: 'audio-button',
         textContent: '♪',
         onclick: async () => {
-            if (!audioUrls[entryIndex]) {
+            if (!audioUrls[entryIndex] && window.audioSources?.length) {
                 audioUrls[entryIndex] = await fetchAudioUrl(expression, reading);
             }
-            if (audioUrls[entryIndex]) {
+            
+            const url = audioUrls[entryIndex];
+            if (url) {
                 if (currentAudio) currentAudio.pause();
-                currentAudio = new Audio(audioUrls[entryIndex]);
-                currentAudio.play().catch(() => {});
+                
+                if (url.startsWith('tts://')) {
+                    const voiceId = url.slice(6);
+                    webkit.messageHandlers.speakText.postMessage({
+                        text: reading || expression,
+                        voiceId: voiceId
+                    });
+                } else {
+                    currentAudio = new Audio(url);
+                    currentAudio.play().catch(() => {});
+                }
             } else {
                 button.textContent = '✕';
                 setTimeout(() => button.textContent = '♪', 1500);

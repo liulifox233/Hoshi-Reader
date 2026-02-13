@@ -86,6 +86,7 @@ struct PopupWebView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.userContentController.add(context.coordinator, name: "mineEntry")
         config.userContentController.add(context.coordinator, name: "openLink")
+        config.userContentController.add(context.coordinator, name: "speakText")
         config.setURLSchemeHandler(ProxyHandler(), forURLScheme: "proxy")
         config.mediaTypesRequiringUserActionForPlayback = []
         
@@ -112,6 +113,7 @@ struct PopupWebView: UIViewRepresentable {
         webView.evaluateJavaScript("stopAudio()")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "mineEntry")
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "openLink")
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "speakText")
     }
     
     class Coordinator: NSObject, WKScriptMessageHandler {
@@ -129,6 +131,15 @@ struct PopupWebView: UIViewRepresentable {
             if message.name == "openLink", let urlString = message.body as? String,
                let url = URL(string: urlString) {
                 UIApplication.shared.open(url)
+            }
+            if message.name == "speakText" {
+                if let text = message.body as? String {
+                    TTSManager.shared.speak(text)
+                } else if let body = message.body as? [String: String],
+                          let text = body["text"],
+                          let voiceId = body["voiceId"] {
+                    TTSManager.shared.speak(text, voiceId: voiceId)
+                }
             }
         }
     }
