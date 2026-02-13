@@ -11,55 +11,41 @@ import CYomitanDicts
 
 struct DictionarySearchView: View {
     @Environment(UserConfig.self) private var userConfig
-    @State private var query: String = ""
+    
+    @Binding var query: String
+    
     @State private var lastQuery: String = ""
     @State private var content: String = ""
-    @State private var hasSearched = false
-    @State private var searchFocused = false
-    @State private var didInitialQuery = false
-    var initialQuery: String = ""
-    var initialAutofocus: Bool = true
     
     var body: some View {
         PopupWebView(
             content: content,
             onMine: { minedContent in
-                AnkiManager.shared.addNote(content: minedContent, context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil))
+                AnkiManager.shared.addNote(
+                    content: minedContent,
+                    context: MiningContext(sentence: lastQuery, documentTitle: nil, coverURL: nil)
+                )
             }
         )
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea()
-        .overlay(alignment: .bottom) {
-            DictionarySearchBar(text: $query, isFocused: $searchFocused) {
-                runLookup()
-            }
+        .onChange(of: query) { _, newValue in
+            runLookup()
         }
         .onAppear {
-            if !didInitialQuery && !initialQuery.isEmpty {
-                query = initialQuery
+            if !query.isEmpty {
                 runLookup()
-            }
-            if initialAutofocus || didInitialQuery {
-                searchFocused = false
-                Task { @MainActor in
-                    searchFocused = true
-                }
-            } else {
-                searchFocused = false
-                didInitialQuery = true
             }
         }
     }
     
     private func runLookup() {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        hasSearched = true
-        lastQuery = trimmed
-        
         guard !trimmed.isEmpty else {
             content = ""
             return
         }
+        lastQuery = trimmed
         
         let results = LookupEngine.shared.lookup(trimmed, maxResults: userConfig.maxResults)
         if results.isEmpty {

@@ -28,6 +28,8 @@ struct BookshelfView: View {
     @State private var showBulkDeleteConfirmation = false
     @Binding var pendingImportURL: URL?
     @Binding var pendingLookup: String?
+    @State private var dictionarySearchText = ""
+    @FocusState private var isSearchFocused: Bool
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -87,18 +89,7 @@ struct BookshelfView: View {
                 }
             }
             
-            Tab("Dictionary", systemImage: "character.magnify.ja", value: 1) {
-                NavigationStack {
-                    DictionarySearchView(
-                        initialQuery: dictionaryRoute.query,
-                        initialAutofocus: dictionaryRoute.autofocus
-                    )
-                    .id(dictionaryRoute.id)
-                    .navigationTitle("Dictionary")
-                }
-            }
-            
-            Tab("Settings", systemImage: "gearshape", value: 2) {
+            Tab("Settings", systemImage: "gearshape", value: 1) {
                 NavigationStack {
                     List {
                         Button {
@@ -156,6 +147,15 @@ struct BookshelfView: View {
                             .presentationDetents([.medium])
                             .preferredColorScheme(userConfig.theme == .custom ? userConfig.uiTheme.colorScheme : (userConfig.theme.colorScheme ?? systemColorScheme))
                     }
+                }
+            }
+            
+            Tab("Dictionary", systemImage: "character.magnify.ja", value: 2, role: .search) {
+                NavigationStack {
+                    DictionarySearchView(query: $dictionarySearchText)
+                        .navigationTitle("Dictionary")
+                        .searchable(text: $dictionarySearchText, prompt: "Search Word...")
+                        .searchPresentationToolbarBehavior(.automatic)
                 }
             }
         }

@@ -93,7 +93,8 @@ struct PopupWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = true
-        webView.scrollView.bounces = false
+        webView.scrollView.bounces = true
+        webView.scrollView.keyboardDismissMode = .onDrag
         
         return webView
     }
