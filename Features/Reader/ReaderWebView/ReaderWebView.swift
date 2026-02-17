@@ -57,6 +57,7 @@ struct ReaderWebView: UIViewRepresentable {
     var onSaveBookmark: (Double) -> Void
     var onTextSelected: ((SelectionData) -> Int?)?
     var onTapOutside: (() -> Void)?
+    var onPageTurn: (() -> Void)?
     let maxSelectionLength: Int = 16
     
     func makeCoordinator() -> Coordinator {
@@ -364,6 +365,7 @@ struct ReaderWebView: UIViewRepresentable {
             
             clearHighlight()
             parent.onTapOutside?()
+            parent.onPageTurn?()
             
             let script = paginationScript(direction: direction)
             

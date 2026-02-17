@@ -21,16 +21,26 @@ struct StatisticsSettingsView: View {
             
             if userConfig.enableStatistics {
                 Section {
-                    Toggle("ッツ Sync", isOn: $userConfig.statisticsEnableSync)
-                    Picker("Sync Behaviour", selection: $userConfig.statisticsSyncMode) {
-                        ForEach(StatisticsSyncMode.allCases, id: \.self) { mode in
+                    Picker("Autostart", selection: $userConfig.statisticsAutostartMode) {
+                        ForEach(StatisticsAutostartMode.allCases, id: \.self) { mode in
                             Text(mode.rawValue).tag(mode)
                         }
                     }
-                } header: {
-                    Text("Sync")
-                } footer: {
-                    Text("Determines if statistics will be merged entry by entry or replaced completely on a sync.")
+                }
+                
+                if userConfig.enableSync {
+                    Section {
+                        Toggle("ッツ Sync", isOn: $userConfig.statisticsEnableSync)
+                        Picker("Sync Behaviour", selection: $userConfig.statisticsSyncMode) {
+                            ForEach(StatisticsSyncMode.allCases, id: \.self) { mode in
+                                Text(mode.rawValue).tag(mode)
+                            }
+                        }
+                    } header: {
+                        Text("Sync")
+                    } footer: {
+                        Text("Determines if statistics will be merged entry by entry or replaced completely on a sync.")
+                    }
                 }
             }
         }

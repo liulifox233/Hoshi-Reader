@@ -59,6 +59,7 @@ class ReaderViewModel {
     let document: EPUBDocument
     let rootURL: URL
     let enableStatistics: Bool
+    let autostartStatistics: Bool
     
     // reader
     var index: Int = 0
@@ -83,10 +84,11 @@ class ReaderViewModel {
     var todaysStatistics: Statistics
     var allTimeStatistics: Statistics
     
-    init(document: EPUBDocument, rootURL: URL, enableStatistics: Bool) {
+    init(document: EPUBDocument, rootURL: URL, enableStatistics: Bool, autostartStatistics: Bool) {
         self.document = document
         self.rootURL = rootURL
         self.enableStatistics = enableStatistics
+        self.autostartStatistics = autostartStatistics
         
         if let bookmark = BookStorage.loadBookmark(root: rootURL) {
             index = bookmark.chapterIndex
@@ -108,6 +110,10 @@ class ReaderViewModel {
         
         if enableStatistics {
             loadStatistics()
+        }
+        
+        if autostartStatistics {
+            startTracking()
         }
         
         if let url = getCurrentChapter() {

@@ -193,6 +193,10 @@ class UserConfig {
         didSet { UserDefaults.standard.set(statisticsSyncMode.rawValue, forKey: "statisticsSyncMode") }
     }
     
+    var statisticsAutostartMode: StatisticsAutostartMode {
+        didSet { UserDefaults.standard.set(statisticsAutostartMode.rawValue, forKey: "statisticsAutostartMode") }
+    }
+    
     init() {
         let defaults = UserDefaults.standard
         
@@ -248,6 +252,8 @@ class UserConfig {
         self.statisticsEnableSync = defaults.object(forKey: "statisticsEnableSync") as? Bool ?? false
         self.statisticsSyncMode = defaults.string(forKey: "statisticsSyncMode")
             .flatMap(StatisticsSyncMode.init) ?? .merge
+        self.statisticsAutostartMode = defaults.string(forKey: "statisticsAutostartMode")
+            .flatMap(StatisticsAutostartMode.init) ?? .off
     }
     
     private static func saveColor(_ color: Color, key: String) {

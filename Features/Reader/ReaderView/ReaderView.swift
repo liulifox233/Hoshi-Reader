@@ -31,7 +31,7 @@ struct ReaderLoader: View {
     var body: some View {
         Group {
             if let doc = viewModel.document, let root = viewModel.rootURL {
-                ReaderView(document: doc, rootURL: root, enableStatistics: userConfig.enableStatistics)
+                ReaderView(document: doc, rootURL: root, enableStatistics: userConfig.enableStatistics, autostartStatistics: userConfig.statisticsAutostartMode == .on)
                     .interactiveDismissDisabled()
             } else {
                 ProgressView()
@@ -75,8 +75,8 @@ struct ReaderView: View {
         }
     }
     
-    init(document: EPUBDocument, rootURL: URL, enableStatistics: Bool) {
-        _viewModel = State(initialValue: ReaderViewModel(document: document, rootURL: rootURL, enableStatistics: enableStatistics))
+    init(document: EPUBDocument, rootURL: URL, enableStatistics: Bool, autostartStatistics: Bool) {
+        _viewModel = State(initialValue: ReaderViewModel(document: document, rootURL: rootURL, enableStatistics: enableStatistics, autostartStatistics: autostartStatistics))
     }
     
     var progressString: String {
@@ -111,7 +111,12 @@ struct ReaderView: View {
                         onTextSelected: { selection in
                             viewModel.handleTextSelection(selection, maxResults: userConfig.maxResults)
                         },
-                        onTapOutside: viewModel.closePopup
+                        onTapOutside: viewModel.closePopup,
+                        onPageTurn: {
+                            if userConfig.statisticsAutostartMode == .pageturn && !viewModel.isTracking {
+                                viewModel.startTracking()
+                            }
+                        }
                     )
                     .id(WebViewState(
                         verticalWriting: userConfig.verticalWriting,

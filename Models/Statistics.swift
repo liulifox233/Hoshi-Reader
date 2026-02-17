@@ -9,6 +9,12 @@
 
 import Foundation
 
+enum StatisticsAutostartMode: String, CaseIterable, Codable {
+    case off = "Off"
+    case pageturn = "Page Turn"
+    case on = "On"
+}
+
 enum StatisticsSyncMode: String, CaseIterable, Codable {
     case merge = "Merge"
     case replace = "Replace"
