@@ -285,5 +285,6 @@ struct ReaderView: View {
         .ignoresSafeArea(edges: .top)
         .ignoresSafeArea(.keyboard)
         .statusBarHidden(focusMode)
+        .persistentSystemOverlays(focusMode ? .hidden : .automatic)
     }
 }
